@@ -25,7 +25,7 @@ That's what's so great about this, if this is in a browser that doesn't support 
 ```jsx
 import { createTheme } from "untitled-theming-experiment";
 
-let { ThemeProvider, useTheme } = createTheme({
+let { Provider, useTheme } = createTheme({
   color: "green",
   spacing: ["4px", "8px", "12px", "16px"]
 });
@@ -53,6 +53,8 @@ render(
 # When should I not use this?
 
 This library is built for themes that change a lot dynamically at runtime. If your theme rarely or never changes dynamically at runtime you may be better off directly using context or putting your theme in a file and importing it from there.
+
+Another important caveat to remember with this library is that since you don't have access to the actual values, you can't do things like lighten/darken colors and etc.
 
 # API
 
