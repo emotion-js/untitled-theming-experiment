@@ -1,7 +1,6 @@
 // @flow
 import * as React from "react";
 import { useContext } from "react";
-import weakMemoize from "@emotion/weak-memoize";
 
 let isBrowser = typeof window === "undefined";
 
@@ -18,16 +17,18 @@ type ThemeType =
   | string
   | $ReadOnlyArray<ThemeType>;
 
+type ProviderProps<Theme> = {
+  theme: Theme,
+  children?: React.Node,
+  supportsCSSVariables?: boolean
+};
+
 type Ret<Theme> = {
   Consumer: React.ComponentType<{
     children: Theme => ?React.Node
   }>,
   useTheme: () => Theme,
-  Provider: React.ComponentType<{
-    theme: Theme | (Theme => Theme),
-    children: React.Node,
-    supportsCSSVariables?: boolean
-  }>,
+  Provider: React.ComponentType<ProviderProps<Theme>>,
   Extender: React.ComponentType<{ children: React.Node }>
 };
 
@@ -83,11 +84,10 @@ function getInlineStyles(
 
 export let createTheme = <Theme: ThemeType>(
   defaultTheme: Theme,
-  options?: { prefix?: string } = {}
+  { prefix = "theme" }: { prefix?: string } = {}
 ): $ReadOnly<Ret<Theme>> => {
   let RawThemeContext = React.createContext(defaultTheme);
 
-  let prefix = options.prefix || "theme";
   let shouldUseCSSVars =
     canUseCSSVars &&
     document.querySelector(`[data-theme-emotion-no-var]`) === null;
@@ -96,69 +96,35 @@ export let createTheme = <Theme: ThemeType>(
   // $FlowFixMe this isn't just to get flow to be quiet, i actually want to fix this because i think flow might be right
   let cssVarUsageTheme: Theme = getCSSVarUsageTheme(defaultTheme, "", prefix);
 
-  type ProviderProps = {
-    theme: Theme | (Theme => Theme),
-    children: React.Node,
-    supportsCSSVariables?: boolean
-  };
-  function renderInnerCSSVarsProvider(theme: Theme, children: React.Node) {
-    return (
-      <RawThemeContext.Provider value={theme}>
-        <Context.Provider value={cssVarUsageTheme}>
-          <div
-            data-theme-emotion={prefix}
-            style={getInlineStyles(theme, "", {}, prefix)}
-          >
-            {children}
-          </div>
-        </Context.Provider>
-      </RawThemeContext.Provider>
-    );
-  }
-  let isStringTheme = typeof defaultTheme === "string";
-  let merge = weakMemoize(theme => {
-    return weakMemoize(theme);
-  });
-
-  let Provider = (props: ProviderProps) => {
+  let Provider = (props: ProviderProps<Theme>) => {
     let { theme, children } = props;
     if (shouldUseCSSVars) {
-      if (typeof theme === "function") {
-        return (
-          <RawThemeContext.Consumer>
-            {outerTheme => {
-              return renderInnerCSSVarsProvider(
-                (isStringTheme ? theme : merge(theme))(outerTheme),
-                children
-              );
-            }}
-          </RawThemeContext.Consumer>
-        );
-      }
-      return renderInnerCSSVarsProvider(theme, children);
-    }
-    if (typeof theme === "function") {
       return (
-        <Context.Consumer>
-          {outerTheme => (
-            <Context.Provider
-              value={(isStringTheme ? theme : merge(theme))(outerTheme)}
+        <RawThemeContext.Provider value={theme}>
+          <Context.Provider value={cssVarUsageTheme}>
+            <div
+              data-theme-emotion={prefix}
+              style={getInlineStyles(theme, "", {}, prefix)}
             >
               {children}
-            </Context.Provider>
-          )}
-        </Context.Consumer>
+            </div>
+          </Context.Provider>
+        </RawThemeContext.Provider>
       );
     }
+
     return <Context.Provider value={theme}>{children}</Context.Provider>;
   };
   if (!isBrowser) {
     let SupportsCSSVarsContext = React.createContext(false);
-    let renderInnerSSRProvider = (
-      theme: Theme,
-      supportsCSSVars: boolean,
-      children: React.Node
-    ) => {
+    Provider = (props: ProviderProps<Theme>) => {
+      let supportsCSSVarsFromContext = useContext(SupportsCSSVarsContext);
+      let supportsCSSVars =
+        props.supportsCSSVariables === undefined
+          ? supportsCSSVarsFromContext
+          : props.supportsCSSVariables;
+      let theme = props.theme;
+
       return (
         <SupportsCSSVarsContext.Provider value={supportsCSSVars}>
           {supportsCSSVars ? (
@@ -168,55 +134,30 @@ export let createTheme = <Theme: ThemeType>(
                   data-theme-emotion={prefix}
                   style={getInlineStyles(theme, "", {}, prefix)}
                 >
-                  {children}
+                  {props.children}
                 </div>
               </Context.Provider>
             </RawThemeContext.Provider>
           ) : (
             <Context.Provider value={theme}>
-              <div data-theme-emotion-no-var="">{children}</div>
+              <div data-theme-emotion-no-var="">{props.children}</div>
             </Context.Provider>
           )}
         </SupportsCSSVarsContext.Provider>
       );
     };
-    Provider = (props: ProviderProps) => (
-      <SupportsCSSVarsContext.Consumer>
-        {supportsCSSVarsFromContext => {
-          let supportsCSSVars =
-            props.supportsCSSVariables === undefined
-              ? supportsCSSVarsFromContext
-              : props.supportsCSSVariables;
-          let theme = props.theme;
-          if (typeof theme === "function") {
-            return (
-              <RawThemeContext.Consumer>
-                {outerTheme =>
-                  renderInnerSSRProvider(
-                    theme(outerTheme),
-                    supportsCSSVars,
-                    props.children
-                  )
-                }
-              </RawThemeContext.Consumer>
-            );
-          }
-          return renderInnerSSRProvider(theme, supportsCSSVars, props.children);
-        }}
-      </SupportsCSSVarsContext.Consumer>
-    );
   }
 
   let Extender = (props: { children: React.Node }) => {
     if (shouldUseCSSVars) {
+      // yes, i know i'm breaking the rules
+      // it's okay though
+      // because shouldUseCSSVars will be constant
+      let theme = useContext(RawThemeContext);
       return (
-        <RawThemeContext.Consumer>
-          {theme => (
-            <div style={getInlineStyles(theme, "", {}, prefix)}>
-              {props.children}
-            </div>
-          )}
-        </RawThemeContext.Consumer>
+        <div style={getInlineStyles(theme, "", {}, prefix)}>
+          {props.children}
+        </div>
       );
     }
     return props.children;

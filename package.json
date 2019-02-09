@@ -1,12 +1,15 @@
 {
   "name": "untitled-theming-experiment",
   "version": "0.1.0",
-  "main": "index.js",
+  "main": "dist/untitled-theming-experiment.cjs.js",
   "license": "MIT",
   "repository": "https://github.com/emotion-js/untitled-theming-experiment",
   "devDependencies": {
     "@babel/preset-env": "^7.3.1",
     "@babel/preset-flow": "^7.0.0",
+    "@babel/preset-react": "^7.0.0",
+    "babel-eslint": "^10.0.1",
+    "eslint": "^5.13.0",
     "flow-bin": "^0.92.1",
     "jest": "^24.1.0",
     "jest-emotion": "^10.0.7",
@@ -14,7 +17,8 @@
     "react": "^16.8.1",
     "react-test-renderer": "^16.8.1"
   },
-  "dependencies": {
-    "@emotion/weak-memoize": "^0.2.2"
+  "module": "dist/untitled-theming-experiment.esm.js",
+  "peerDependencies": {
+    "react": ">=16.8.0"
   }
 }
